@@ -29,3 +29,6 @@ pci-profiles-not-found = No PCI profiles found!
 usb-profiles-not-found = No USB profiles found!
 no-installed-profiles = No installed profiles!
 no-installed-profile-device = no installed profile for devices found!
+packages-header = Package
+conditional-packages-header = Conditional packages script:
+profile-not-found-list = profile '{$profile_name}' not found!

@@ -54,6 +54,10 @@ pub struct Args {
     #[arg(long, group = "listings")]
     pub list_all: bool,
 
+    /// List packages for a profile
+    #[arg(long, value_name = "profile", group = "listings")]
+    pub list_pkg: Option<String>,
+
     /// Autoconfigure
     #[arg(short, long, value_name = "classid", conflicts_with_all(["install", "remove"]), default_missing_value = "any", num_args(0..=1))]
     pub autoconfigure: Option<String>,

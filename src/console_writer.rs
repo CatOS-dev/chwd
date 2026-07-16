@@ -57,6 +57,16 @@ pub fn handle_arguments_listing(data: &Data, args: &crate::args::Args) {
         }
     }
 
+    // List packages for a profile
+    if let Some(profile_name) = &args.list_pkg {
+        let all_profiles = data.all_profiles();
+        if let Some(profile) = all_profiles.iter().find(|p| p.name == *profile_name) {
+            list_profile_packages(profile);
+        } else {
+            print_warn_msg!("profile-not-found-list", profile_name = profile_name.as_str());
+        }
+    }
+
     // List available profiles
     if args.list_available {
         let pci_devices = &data.pci_devices;
@@ -117,6 +127,45 @@ pub fn handle_arguments_listing(data: &Data, args: &crate::args::Args) {
                 );
             }
         }
+    }
+}
+
+pub fn list_profile_packages(profile: &Profile) {
+    println!();
+    println!("Profile: {}", profile.name);
+    println!();
+
+    let packages: Vec<&str> = profile.packages.split_ascii_whitespace().collect();
+    if packages.is_empty() {
+        println!("(no packages)\n");
+    } else {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL)
+            .apply_modifier(UTF8_ROUND_CORNERS)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![&fl!("packages-header")]);
+
+        for pkg in &packages {
+            table.add_row(vec![*pkg]);
+        }
+
+        println!("{table}\n");
+    }
+
+    if !profile.conditional_packages.is_empty() {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL)
+            .apply_modifier(UTF8_ROUND_CORNERS)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![&fl!("conditional-packages-header")]);
+
+        for line in profile.conditional_packages.lines() {
+            table.add_row(vec![line]);
+        }
+
+        println!("{table}\n");
     }
 }
 

@@ -23,6 +23,7 @@ const REPLACE_PART: &str = "-headers";
 #[derive(Debug)]
 pub struct Kernel<'a> {
     pub name: String,
+    #[allow(dead_code)]
     pub repo: String,
     pub raw: String,
     alpm_pkg: Option<&'a alpm::Package>,
