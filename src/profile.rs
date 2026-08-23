@@ -44,12 +44,14 @@ pub struct Profile {
     pub pre_remove: String,
     pub conditional_packages: String,
     pub device_name_pattern: Option<String>,
+    pub board_name_pattern: Option<String>,
     pub hwd_product_name_pattern: Option<String>,
     pub gc_versions: Option<Vec<String>>,
     pub cpu_family: Option<String>,
     pub cpu_models: Option<Vec<String>>,
     pub chassis_types: Option<Vec<String>>,
     pub environment_types: Option<Vec<String>>,
+    pub driver_conflict_group: Option<String>,
 
     pub hwd_ids: Vec<HardwareID>,
 }
@@ -70,11 +72,13 @@ impl Default for Profile {
             conditional_packages: String::new(),
             device_name_pattern: None,
             hwd_product_name_pattern: None,
+            board_name_pattern: None,
             gc_versions: None,
             cpu_family: None,
             cpu_models: None,
             chassis_types: None,
             environment_types: None,
+            driver_conflict_group: None,
             hwd_ids: vec![Default::default()],
         }
     }
@@ -248,16 +252,21 @@ fn parse_profile(node: &toml::Table, profile_name: &str) -> Result<Profile> {
         hwd_product_name_pattern: node
             .get("hwd_product_name_pattern")
             .and_then(|x| x.as_str().map(str::to_string)),
+        board_name_pattern: node
+            .get("board_name_pattern")
+            .and_then(|x| x.as_str().map(str::to_string)),
         gc_versions: parse_whitespace_list(node, "gc_versions"),
         cpu_family: node.get("cpu_family").and_then(|x| x.as_str().map(str::to_string)),
         cpu_models: parse_whitespace_list(node, "cpu_models"),
         chassis_types: parse_whitespace_list(node, "chassis_types"),
         environment_types: parse_whitespace_list(node, "environment_types"),
+        driver_conflict_group: node
+            .get("driver_conflict_group")
+            .and_then(|x| x.as_str().map(str::to_string)),
     };
 
     if profile.cpu_models.is_some() && profile.cpu_family.is_none() {
-        let msg =
-            format!("profile '{profile_name}' specifies cpu_models without cpu_family");
+        let msg = format!("profile '{profile_name}' specifies cpu_models without cpu_family");
         eprintln!("Warning: skipping profile '{profile_name}': {msg}");
         anyhow::bail!(msg);
     }
@@ -448,6 +457,9 @@ fn profile_into_toml(profile: &Profile) -> toml::Table {
     if let Some(product_name_pattern) = &profile.hwd_product_name_pattern {
         table.insert("hwd_product_name_pattern".to_owned(), product_name_pattern.clone().into());
     }
+    if let Some(board_name_pattern) = &profile.board_name_pattern {
+        table.insert("board_name_pattern".to_owned(), board_name_pattern.clone().into());
+    }
     if let Some(gc_versions) = &profile.gc_versions {
         table.insert("gc_versions".to_owned(), gc_versions.join(" ").into());
     }
@@ -462,6 +474,9 @@ fn profile_into_toml(profile: &Profile) -> toml::Table {
     }
     if let Some(environment_types) = &profile.environment_types {
         table.insert("environment_types".to_owned(), environment_types.join(" ").into());
+    }
+    if let Some(conflict_group) = &profile.driver_conflict_group {
+        table.insert("driver_conflict_group".to_owned(), conflict_group.clone().into());
     }
 
     let last_hwd_id = profile.hwd_ids.last().unwrap();
@@ -480,7 +495,7 @@ fn profile_into_toml(profile: &Profile) -> toml::Table {
 mod tests {
     use std::fs;
 
-    use crate::profile::{parse_profiles, HardwareID};
+    use crate::profile::{HardwareID, parse_profiles};
 
     #[test]
     fn graphics_profiles_correct() {
@@ -529,6 +544,7 @@ mod tests {
         assert!(!parsed_profiles[1].conditional_packages.is_empty());
         assert_eq!(parsed_profiles[1].device_name_pattern, None);
         assert_eq!(parsed_profiles[1].hwd_product_name_pattern, Some("(Ally)\\w+".to_owned()));
+        assert_eq!(parsed_profiles[1].board_name_pattern, Some("(MS-1T)\\w+".to_owned()));
         assert_eq!(parsed_profiles[1].hwd_ids, hwd_ids);
         assert_eq!(parsed_profiles[1].gc_versions, None);
         assert_eq!(parsed_profiles[1].chassis_types, None);
@@ -571,6 +587,7 @@ mod tests {
         );
         assert!(parsed_profiles[0].conditional_packages.is_empty());
         assert_eq!(parsed_profiles[0].hwd_product_name_pattern, None);
+        assert_eq!(parsed_profiles[0].board_name_pattern, None);
         assert_eq!(parsed_profiles[0].hwd_ids, hwd_ids);
         assert_eq!(parsed_profiles[0].gc_versions, None);
         assert_eq!(parsed_profiles[0].chassis_types, None);
