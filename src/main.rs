@@ -84,6 +84,11 @@ fn main() -> anyhow::Result<()> {
         anyhow::bail!("Error occurred");
     }
 
+    if argstruct.json {
+        console_writer::print_json_report(&data_obj)?;
+        return Ok(());
+    }
+
     // 3) Perform operations
     console_writer::handle_arguments_listing(&data_obj, &argstruct);
 

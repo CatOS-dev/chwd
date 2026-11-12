@@ -14,7 +14,8 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-use crate::data::Data;
+use crate::data::{self, Data};
+use crate::device::Device;
 use crate::fl;
 use crate::misc::Message;
 use crate::profile::Profile;
@@ -22,6 +23,79 @@ use crate::profile::Profile;
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{ContentArrangement, Table};
+use serde_json::{json, Value};
+
+fn profile_json(profile: &Profile) -> Value {
+    json!({
+        "name": profile.name,
+        "description": profile.desc,
+        "priority": profile.priority,
+        "packages": profile.packages.split_whitespace().collect::<Vec<_>>(),
+        "hasConditionalPackages": !profile.conditional_packages.trim().is_empty(),
+        "hasHooks": !profile.pre_install.trim().is_empty()
+            || !profile.post_install.trim().is_empty()
+            || !profile.pre_remove.trim().is_empty()
+            || !profile.post_remove.trim().is_empty(),
+        "conflictGroup": profile.driver_conflict_group,
+        "aiSdk": profile.is_ai_sdk,
+    })
+}
+
+fn device_json(bus: &str, device: &Device, recommended: Option<&str>) -> Value {
+    json!({
+        "bus": bus,
+        "id": device.sysfs_busid,
+        "classId": device.class_id,
+        "className": device.class_name,
+        "vendorId": device.vendor_id,
+        "deviceId": device.device_id,
+        "vendor": device.vendor_name,
+        "name": device.device_name,
+        "availableProfiles": device.available_profiles.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+        "installedProfiles": device.installed_profiles.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+        "recommendedProfile": recommended,
+    })
+}
+
+/// Read-only report for consumers that must not parse localized terminal tables.
+pub fn print_json_report(data: &Data) -> anyhow::Result<()> {
+    let resolution = data::resolve_conflict_groups(&data.pci_devices);
+    let mut devices = Vec::new();
+    for device in &data.pci_devices {
+        let recommended = if resolution.skipped_devices.contains(&device.sysfs_busid) {
+            None
+        } else {
+            resolution.device_profile_map.iter()
+                .find(|(busid, _)| busid == &device.sysfs_busid)
+                .map(|(_, name)| name.as_str())
+                .or_else(|| device.available_profiles.first().map(|p| p.name.as_str()))
+        };
+        devices.push(device_json("pci", device, recommended));
+    }
+    for device in &data.usb_devices {
+        devices.push(device_json("usb", device,
+            device.available_profiles.first().map(|p| p.name.as_str())));
+    }
+    let mut all_profiles = data.all_profiles();
+    let installed_profiles = data.installed_profiles();
+    for profile in &installed_profiles {
+        if !all_profiles.iter().any(|candidate| candidate.name == profile.name) {
+            all_profiles.push(profile.clone());
+        }
+    }
+    let profiles = all_profiles.iter().map(profile_json).collect::<Vec<_>>();
+    let installed = installed_profiles.iter()
+        .map(|p| p.name.as_str().to_owned()).collect::<Vec<_>>();
+    let report = json!({
+        "schema": 1,
+        "devices": devices,
+        "profiles": profiles,
+        "installedProfiles": installed,
+        "warnings": resolution.warnings,
+    });
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(())
+}
 
 pub fn handle_arguments_listing(data: &Data, args: &crate::args::Args) {
     // Check for invalid profiles

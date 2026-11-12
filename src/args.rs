@@ -58,6 +58,10 @@ pub struct Args {
     #[arg(long, value_name = "profile", group = "listings")]
     pub list_pkg: Option<String>,
 
+    /// Machine-readable hardware and profile state
+    #[arg(long, conflicts_with_all = ["install", "remove", "autoconfigure", "check", "listings", "force"])]
+    pub json: bool,
+
     /// Autoconfigure
     #[arg(short, long, value_name = "classid", conflicts_with_all(["install", "remove"]), default_missing_value = "any", num_args(0..=1))]
     pub autoconfigure: Option<String>,

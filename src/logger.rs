@@ -21,7 +21,7 @@ impl log::Log for SimpleLogger {
                 Level::Debug => "Debug:".white(),
                 Level::Trace => "Trace:".black(),
             };
-            if record.level() == Level::Error {
+            if record.level() == Level::Error || env::args().any(|arg| arg == "--json") {
                 eprintln!("{level_str} {}", record.args());
             } else {
                 println!("{level_str} {}", record.args());
