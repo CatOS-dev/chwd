@@ -35,8 +35,6 @@ pub struct KernelPkg {
     pub category: String,
     pub installed: bool,
     pub update_available: bool,
-    /// Repo the package was installed from; empty when not installed.
-    pub installed_db: String,
     pub headers_pkg: String,
     /// Module packages; empty when the sync db has no such package.
     pub zfs_pkg: String,
@@ -105,36 +103,6 @@ fn localdb_has(handle: &alpm::Alpm, name: &str) -> bool {
     handle.localdb().pkg(name.as_bytes()).is_ok()
 }
 
-mod alpm_ffi {
-    use std::os::raw::{c_char, c_void};
-
-    unsafe extern "C" {
-        pub fn alpm_db_get_pkg(db: *mut c_void, name: *const c_char) -> *mut c_void;
-        pub fn alpm_pkg_get_installed_db(pkg: *mut c_void) -> *const c_char;
-    }
-}
-
-/// Repo a package was InstalledFrom.
-fn installed_db_name(local_db: &alpm::Db, name: &str) -> String {
-    let Ok(cname) = std::ffi::CString::new(name) else {
-        return String::new();
-    };
-    // SAFETY: localdb owned by the alpm handle. Both calls
-    // return borrowed pointers owned by libalpm, and the
-    // returned C string outlives this call.
-    unsafe {
-        let pkg = alpm_ffi::alpm_db_get_pkg(local_db.as_ptr().cast(), cname.as_ptr());
-        if pkg.is_null() {
-            return String::new();
-        }
-        let db_name = alpm_ffi::alpm_pkg_get_installed_db(pkg);
-        if db_name.is_null() {
-            return String::new();
-        }
-        std::ffi::CStr::from_ptr(db_name).to_string_lossy().into_owned()
-    }
-}
-
 /// alpm version comparison exposed.
 pub fn vercmp(a: &str, b: &str) -> i32 {
     match alpm::vercmp(a, b) {
@@ -193,7 +161,6 @@ pub fn get_kernels(handle: &alpm::Alpm) -> Vec<KernelPkg> {
                 category: category_of(base_name).to_owned(),
                 installed: localdb_has(handle, base_name),
                 update_available,
-                installed_db: installed_db_name(handle.localdb(), base_name),
                 headers_pkg: header_name.to_owned(),
                 ..Default::default()
             };
